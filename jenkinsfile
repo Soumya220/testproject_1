@@ -1,0 +1,83 @@
+pipeline{ 
+    agent any
+     environment{
+	dockerImage=''
+	registry='soumyade1999/soumya15'
+	registryCredentials='Dockerhub'
+    }
+    stages{ 
+        stage ('Checkout'){ 
+        
+            steps{
+            echo 'Checkout'
+        }
+    }
+     stage('Build') {
+            steps {
+                echo 'Clean Build'
+                bat 'mvn clean compile'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo 'Testing'
+                bat 'mvn test'
+            }
+        }
+        stage('Sonarqube') {
+            steps {
+                echo 'Sonarqube'
+                  
+                withSonarQubeEnv('Sonarqube') {
+                    bat 'mvn sonar:sonar'
+              
+                }
+            }
+        }
+    
+        stage ('Upload Artifacts'){
+            steps{
+            
+                rtMavenDeployer (
+                id: 'soumya',
+                serverId: 'artifactory',
+                releaseRepo: 'libs-release-local',
+                snapshotRepo: 'libs-snapshot-local',
+                )
+            
+                 rtMavenRun (
+                tool:'MAVEN_HOME',
+                 pom: 'pom.xml',
+                goals: 'clean install',
+                deployerId: 'soumya',
+                )
+            }
+        }
+       
+    
+	stage('Build Docker Image'){
+		steps{
+		script{
+		dockerImage=docker.build registry
+		}
+		}
+	}
+		stage('Uploading Image'){
+		steps{
+		
+		   script{
+		    docker.withRegistry('',registryCredentials){
+		    dockerImage.push()
+		    }
+		   }
+		}
+		
+		}
+
+
+	
+
+
+}       
+}
